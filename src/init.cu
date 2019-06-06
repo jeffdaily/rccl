@@ -33,6 +33,15 @@
 #include <assert.h>
 #include <dlfcn.h>
 
+#include <unistd.h>
+#include <sys/syscall.h>
+
+#ifdef SYS_gettid
+#define GETTID syscall(SYS_gettid)
+#else
+#error "SYS_gettid unavailable on this system"
+#endif
+
 #define STR2(v) #v
 #define STR(v) STR2(v)
 
@@ -497,7 +506,9 @@ ncclResult_t ncclCommSetIntra(struct ncclComm* comm, int rank, int ranks, struct
     comm->launchMode = ncclComm::PARALLEL;
   }
   if (comm->launchMode == ncclComm::GROUP) {
-    CUDACHECK(hipStreamCreateWithFlags(&comm->groupStream, hipStreamNonBlocking));
+    fprintf(stderr, "CU MASKING TEST: tid=%ld ncclCommSetIntra hipStreamCreateWithFlags %d\n",
+            GETTID, hipStreamNonBlocking|0x10);
+    CUDACHECK(hipStreamCreateWithFlags(&comm->groupStream, hipStreamNonBlocking|0x10));
 #if CUDART_VERSION >= 9000
     if (*comm->intraCC && (ncclCudaFullCompCap() == *comm->intraCC)) {
       // Check whether the GPU supports Cooperative Group Multi Device Launch
