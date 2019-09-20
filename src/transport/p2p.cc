@@ -529,7 +529,11 @@ ncclResult_t p2pSendSetup(struct ncclPeerInfo* myInfo, struct ncclPeerInfo* peer
     return ncclInternalError;
   }
   if (linktype != HSA_AMD_LINK_INFO_TYPE_XGMI) {
+#if 0
     CUDACHECK(hipDeviceGetAttribute((int*)&resources->next_hdp_reg, hipDeviceAttributeHdpMemFlushCntl,peerInfo->cudaDev));
+#else
+    NCCLCHECK(getGpuHdpReg(peerInfo->cudaDev, &resources->next_hdp_reg));
+#endif
     TRACE(NCCL_INIT|NCCL_P2P,"Ring %02d : %d -> %d HDP %p", channelId, myInfo->rank, peerInfo->rank, resources->next_hdp_reg);
   }
   else
