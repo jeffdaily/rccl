@@ -779,14 +779,8 @@ ncclResult_t ncclTopoFillGpu(struct ncclXml* xml, const char* busId, struct nccl
   NCCLCHECK(xmlSetAttrIfUnset(node, "class", "0x03"));
   NCCLCHECK(ncclTopoGetXmlFromSys(node, xml));
 #if defined(__HIP_PLATFORM_HCC__) || defined(__HCC__) || defined(__HIPCC__)
-  uint32_t devIndex;
-  static int rocmsmiInit = 0;
-  if (rocmsmiInit == 0) {
-    rocmsmiInit = (rocm_smi_init() != ncclSuccess) ? 2 : 1;
-  }
-  if (rocmsmiInit == 1) {
-    if (rocm_smi_getDeviceIndexByPciBusId(busId, &devIndex) != ncclSuccess) devIndex = -1;
-  }
+  uint32_t devIndex = -1;
+  if (rocm_smi_getDeviceIndexByPciBusId(busId, &devIndex) != ncclSuccess) devIndex = -1;
   NCCLCHECK(ncclTopoGetXmlFromGpu(node, devIndex, xml, gpuNode));
 #else
   nvmlDevice_t nvmlDev = NULL;

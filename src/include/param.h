@@ -9,6 +9,7 @@
 #define NCCL_PARAM_H_
 
 #include <stdint.h>
+#include <mutex>
 
 const char* userHomeDir();
 void setEnvFile(const char* fileName);
@@ -20,10 +21,9 @@ void ncclLoadParam(char const* env, int64_t deftVal, int64_t uninitialized, int6
   int64_t ncclParam##name() { \
     constexpr int64_t uninitialized = INT64_MIN; \
     static_assert(deftVal != uninitialized, "default value cannot be the uninitialized value."); \
+    static std::once_flag flag; \
     static int64_t cache = uninitialized; \
-    if (__builtin_expect(__atomic_load_n(&cache, __ATOMIC_RELAXED) == uninitialized, false)) { \
-      ncclLoadParam("NCCL_" env, deftVal, uninitialized, &cache); \
-    } \
+    std::call_once(flag, ncclLoadParam, "NCCL_" env, deftVal, uninitialized, &cache); \
     return cache; \
   }
 

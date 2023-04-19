@@ -23,6 +23,8 @@ THE SOFTWARE.
 #include "core.h"
 #include "utils.h"
 
+#include <mutex>
+
 #define ROCMSMICHECK(cmd) do {               \
   rsmi_status_t ret = cmd;                   \
   if( ret != RSMI_STATUS_SUCCESS ) {         \
@@ -33,6 +35,11 @@ THE SOFTWARE.
   }                                          \
 } while(false)
 
+static std::mutex rocm_smi_mutex;
+static bool rocm_smi_is_ready{false};
+#define SMI_INIT() \
+std::lock_guard<std::mutex> lock(rocm_smi_mutex); \
+rocm_smi_init_called_once()
 
 ncclResult_t rocm_smi_init() {
   ROCMSMICHECK(rsmi_init(0));
@@ -42,12 +49,24 @@ ncclResult_t rocm_smi_init() {
   return ncclSuccess;
 }
 
+ncclResult_t rocm_smi_init_called_once() {
+  // lock was acquired outside of this function
+  if (rocm_smi_is_ready) {
+    return ncclSuccess;
+  }
+  rocm_smi_init();
+  rocm_smi_is_ready = true;
+  return ncclSuccess;
+}
+
 ncclResult_t rocm_smi_getNumDevice(uint32_t* num_devs) {
+  SMI_INIT();
   ROCMSMICHECK(rsmi_num_monitor_devices(num_devs));
   return ncclSuccess;
 }
 
 ncclResult_t rocm_smi_getDevicePciBusIdString(uint32_t deviceIndex, char* busId, size_t len) {
+  SMI_INIT();
   uint64_t id;
   ROCMSMICHECK(rsmi_dev_pci_id_get(deviceIndex, &id));
   /** rocm_smi's bus ID format
@@ -65,6 +84,7 @@ ncclResult_t rocm_smi_getDevicePciBusIdString(uint32_t deviceIndex, char* busId,
 
 
 ncclResult_t rocm_smi_getDeviceIndexByPciBusId(const char* pciBusId, uint32_t* deviceIndex) {
+  SMI_INIT();
   uint32_t i, num_devs = 0;
   int64_t busid;
 
@@ -97,6 +117,7 @@ ncclResult_t rocm_smi_getDeviceIndexByPciBusId(const char* pciBusId, uint32_t* d
 }
 
 ncclResult_t rocm_smi_getLinkInfo(int srcIndex, int dstIndex, RSMI_IO_LINK_TYPE* rsmi_type, int *hops, int *count) {
+  SMI_INIT();
   uint64_t rsmi_hops, rsmi_weight;
   ROCMSMICHECK(rsmi_topo_get_link_type(srcIndex, dstIndex, &rsmi_hops, rsmi_type));
   ROCMSMICHECK(rsmi_topo_get_link_weight(srcIndex, dstIndex, &rsmi_weight));

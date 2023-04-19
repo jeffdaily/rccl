@@ -251,7 +251,6 @@ ncclResult_t ncclGetLevel(int* level, const char* disableEnv, const char* levelE
 
 NCCL_PARAM(IgnoreDisabledP2p, "IGNORE_DISABLED_P2P", 0);
 
-int ncclTopoUserP2pLevel = -1;
 ncclResult_t ncclTopoCheckP2p(struct ncclTopoSystem* system, int64_t id1, int64_t id2, int* p2p, int *read, int* intermediateRank) {
   *p2p = 0;
   if (read) *read = 0;
@@ -281,8 +280,13 @@ ncclResult_t ncclTopoCheckP2p(struct ncclTopoSystem* system, int64_t id1, int64_
   int p2pLevel = PATH_SYS;
 
   // User override
-  if (ncclTopoUserP2pLevel == -1)
-    NCCLCHECK(ncclGetLevel(&ncclTopoUserP2pLevel, "NCCL_P2P_DISABLE", "NCCL_P2P_LEVEL"));
+  static int ncclTopoUserP2pLevel = -1;
+  {
+    static std::mutex mutex_;
+    std::lock_guard<std::mutex> lock_(mutex_);
+    if (ncclTopoUserP2pLevel == -1)
+      NCCLCHECK(ncclGetLevel(&ncclTopoUserP2pLevel, "NCCL_P2P_DISABLE", "NCCL_P2P_LEVEL"));
+  }
   if (ncclTopoUserP2pLevel != -2) {
     p2pLevel = ncclTopoUserP2pLevel;
     goto compare;
@@ -348,7 +352,6 @@ compare:
 }
 
 NCCL_PARAM(NetGdrRead, "NET_GDR_READ", -2);
-int ncclTopoUserGdrLevel = -1;
 
 ncclResult_t ncclTopoCheckGdr(struct ncclTopoSystem* system, int64_t busId, int netDev, int read, int* useGdr) {
   *useGdr = 0;
@@ -385,7 +388,13 @@ ncclResult_t ncclTopoCheckGdr(struct ncclTopoSystem* system, int64_t busId, int 
 
   // Check if we are close enough that it makes sense to enable GDR
   int netGdrLevel = system->netGdrLevel == -2 ? PATH_PXB : system->netGdrLevel;
-  NCCLCHECK(ncclGetLevel(&ncclTopoUserGdrLevel, NULL, "NCCL_NET_GDR_LEVEL"));
+  static int ncclTopoUserGdrLevel = -1;
+  {
+    static std::mutex mutex_;
+    std::lock_guard<std::mutex> lock_(mutex_);
+    if (ncclTopoUserGdrLevel == -1)
+      NCCLCHECK(ncclGetLevel(&ncclTopoUserGdrLevel, NULL, "NCCL_NET_GDR_LEVEL"));
+  }
   if (ncclTopoUserGdrLevel != -2) netGdrLevel = ncclTopoUserGdrLevel;
   else {
     int arch, vendor, model;
